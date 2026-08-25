@@ -9,17 +9,17 @@ local noticeUntil = os.clock() + 4
 local desktopClock = os.clock()
 
 local apps = {
-  {name="Files",     icon="F", file="apps/files.lua"},
-  {name="Calculator",icon="C", file="apps/calculator.lua"},
-  {name="Notepad",   icon="N", file="apps/notepad.lua"},
-  {name="Clock",     icon="T", file="apps/clock.lua"},
-  {name="Paint",     icon="P", file="apps/paint.lua"},
-  {name="System",    icon="S", file="apps/system.lua"},
-  {name="Settings",  icon="G", file="apps/settings.lua"},
-  {name="Calendar",  icon="D", file="apps/calendar.lua"},
-  {name="Terminal",  icon=">_", file="apps/terminal.lua"},
-  {name="Browser",   icon="B", file="apps/browser.lua"},
-  {name="About",     icon="?", file="apps/about.lua"}
+  {name="Files",      icon="[ ]", file="apps/files.lua"},
+  {name="Calculator", icon="[+ ]", file="apps/calculator.lua"},
+  {name="Notepad",    icon="[_]", file="apps/notepad.lua"},
+  {name="Clock",      icon="[o]", file="apps/clock.lua"},
+  {name="Paint",      icon="[*]", file="apps/paint.lua"},
+  {name="System",     icon="[S]", file="apps/system.lua"},
+  {name="Settings",   icon="[G]", file="apps/settings.lua"},
+  {name="Calendar",   icon="[D]", file="apps/calendar.lua"},
+  {name="Terminal",   icon=">_",  file="apps/terminal.lua"},
+  {name="Browser",    icon="[W]", file="apps/browser.lua"},
+  {name="About",      icon="[?]", file="apps/about.lua"}
 }
 
 local function post(text, seconds)
@@ -27,58 +27,34 @@ local function post(text, seconds)
   noticeUntil = os.clock() + (seconds or 3)
 end
 
-local function fillDesktop()
+local function fillWallpaper()
   W, H = term.getSize()
   term.setBackgroundColor(colors.blue)
   term.setTextColor(colors.white)
   term.clear()
-
-  -- Soft Windows-like wallpaper using broad bands, not app tiles.
-  local rows = {
-    {1, math.max(1, math.floor(H * 0.33)), colors.blue},
-    {math.max(1, math.floor(H * 0.33) + 1), math.max(1, math.floor(H * 0.66)), colors.lightBlue},
-    {math.max(1, math.floor(H * 0.66) + 1), H, colors.cyan}
-  }
-  for _, r in ipairs(rows) do
-    if r[2] >= r[1] then
-      term.setBackgroundColor(r[3])
-      for y = r[1], r[2] do
-        term.setCursorPos(1, y)
-        write(string.rep(" ", W))
-      end
-    end
-  end
-
-  -- Dark translucent-looking center area made from terminal colors.
-  if H >= 12 and W >= 30 then
-    local x1 = math.floor(W * 0.18)
-    local x2 = math.floor(W * 0.82)
-    local y1 = math.floor(H * 0.18)
-    local y2 = math.floor(H * 0.72)
-    ui.rect(x1, y1, x2, y2, colors.blue, colors.blue)
-  end
 end
 
 local function drawTopBar()
   ui.rect(1, 1, W, 2, colors.blue, colors.white)
   ui.text(2, 1, "OScctweaked", colors.white, colors.blue)
+  ui.text(2, 2, "Desktop", colors.lightBlue, colors.blue)
   ui.text(math.max(1, W - 8), 1, os.date("%H:%M"), colors.white, colors.blue)
-  ui.text(2, 2, "Touchscreen Edition", colors.lightBlue, colors.blue)
 end
 
-local function iconShortcut(x, y, app)
-  -- Classic desktop shortcut: small icon, label underneath, no colored square tile.
-  ui.rect(x, y, x + 4, y + 2, colors.blue, colors.white)
-  ui.text(x + 2, y + 1, app.icon, colors.white, colors.blue)
+local function drawShortcut(x, y, app)
+  local icon = app.icon
   local label = app.name
   if #label > 10 then label = label:sub(1, 10) end
-  ui.text(x + math.max(0, math.floor((5 - #label) / 2)), y + 3, label, colors.white, colors.blue)
+
+  -- Plain desktop shortcut: no colored tile, only icon + caption.
+  ui.text(x, y, icon, colors.white, colors.blue)
+  ui.text(x, y + 1, label, colors.white, colors.blue)
 end
 
 local function drawShortcuts()
   local cols = 4
-  local gapX = math.max(9, math.floor(W / 5))
-  local gapY = 6
+  local gapX = math.max(11, math.floor(W / 5))
+  local gapY = 4
   local startX = 2
   local startY = 5
 
@@ -88,8 +64,8 @@ local function drawShortcuts()
     local row = math.floor(n / cols)
     local x = startX + col * gapX
     local y = startY + row * gapY
-    if x + 6 <= W - 1 and y + 4 <= H - 4 then
-      iconShortcut(x, y, app)
+    if x + 10 <= W and y + 1 <= H - 3 then
+      drawShortcut(x, y, app)
     end
   end
 end
@@ -100,16 +76,14 @@ local function drawTaskbar()
   ui.button(12, H - 2, 21, H, "DESK", colors.cyan)
 
   if activeApp then
-    local right = math.min(W - 14, 34)
+    local right = math.min(W - 14, 36)
     if right >= 23 then
-      ui.button(23, H - 2, right, H, activeApp, colors.lightGray, colors.black)
+      ui.button(23, H - 2, right, H, activeApp:sub(1, right - 22), colors.lightGray, colors.black)
     end
   end
 
-  local day = math.floor(os.time())
-  local clock = os.date("%H:%M")
-  ui.text(math.max(1, W - 15), H - 1, "Day " .. day, colors.white, colors.gray)
-  ui.text(math.max(1, W - 6), H, clock, colors.white, colors.gray)
+  ui.text(math.max(1, W - 15), H - 1, "Day " .. math.floor(os.time()), colors.white, colors.gray)
+  ui.text(math.max(1, W - 6), H, os.date("%H:%M"), colors.white, colors.gray)
 end
 
 local function drawNotification()
@@ -123,10 +97,10 @@ local function drawNotification()
 end
 
 local function drawDesktop()
-  fillDesktop()
+  fillWallpaper()
   drawTopBar()
-  ui.text(3, 3, "Desktop", colors.white, colors.blue)
-  ui.text(3, 4, "Touch an icon to open an application", colors.lightBlue, colors.blue)
+  ui.text(3, 3, "Welcome", colors.white, colors.blue)
+  ui.text(3, 4, "Touch an application", colors.lightBlue, colors.blue)
   drawShortcuts()
   drawTaskbar()
   drawNotification()
@@ -141,7 +115,6 @@ local function drawStartMenu()
   ui.rect(x, y, x + mw, y + mh, colors.lightGray, colors.black)
   ui.rect(x, y, x + mw, y + 2, colors.blue, colors.white)
   ui.text(x + 2, y + 1, "START", colors.white, colors.blue)
-
   ui.text(x + 2, y + 4, "Applications", colors.blue, colors.lightGray)
 
   local cols = 2
@@ -174,8 +147,8 @@ end
 
 local function hitShortcut(x, y)
   local cols = 4
-  local gapX = math.max(9, math.floor(W / 5))
-  local gapY = 6
+  local gapX = math.max(11, math.floor(W / 5))
+  local gapY = 4
   local startX = 2
   local startY = 5
 
@@ -185,7 +158,7 @@ local function hitShortcut(x, y)
     local row = math.floor(n / cols)
     local bx = startX + col * gapX
     local by = startY + row * gapY
-    if ui.hit(x, y, bx, by, bx + 6, by + 4) then
+    if ui.hit(x, y, bx, by, bx + 9, by + 1) then
       return app
     end
   end
@@ -204,7 +177,7 @@ local function launch(app)
   drawDesktop()
   term.setCursorBlink(false)
 
-  local ok, err = pcall(function()
+  local ok = pcall(function()
     shell.run(app.file)
   end)
 
