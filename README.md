@@ -1,26 +1,45 @@
-# OScctweaked
+# OScctweaked 😎
 
-A graphical Windows-inspired operating system for CC:Tweaked.
+A Windows-inspired touchscreen operating system written in Lua for CC:Tweaked.
 
 ## Install
 
-Run this on a CC:Tweaked computer with HTTP enabled:
+Enable HTTP in CC:Tweaked and run:
 
 ```lua
 wget run https://raw.githubusercontent.com/Frez7373/OScctweaked/main/installer.lua
 ```
 
-## Vision
+## Current shell
 
-- Touchscreen-first interface
-- Desktop and taskbar
-- Start menu
-- Draggable windows
-- Built-in apps
-- File manager
-- Settings and themes
-- Extensible app system
+- Windows-style desktop
+- Start Menu
+- Taskbar
+- Touchscreen-first navigation
+- Lock screen
+- Notification/toast area
+- Desktop refresh button
+- World-day clock
+- Responsive layout for different terminal sizes
+
+## Apps
+
+- File Explorer
+- Calculator
+- Touch Notepad with on-screen keyboard
+- Clock
+- Paint
+- System Monitor
+- Settings
+- Calendar
+- Touch Terminal
+- HTTP Browser
+- About
+
+## Architecture
+
+`os.lua` is the desktop shell, `ui.lua` is the shared visual toolkit, and `apps/` contains applications. Built-in applications use `mouse_click` and `monitor_touch` for touchscreen navigation.
 
 ## Target
 
-CC:Tweaked computers and advanced computers with monitors/touchscreen support.
+CC:Tweaked computers and advanced computers with monitors/touchscreen peripherals.
