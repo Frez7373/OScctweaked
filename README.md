@@ -1,45 +1,58 @@
-# OScctweaked 😎
+# OScctweaked
 
-A Windows-inspired touchscreen operating system written in Lua for CC:Tweaked.
+A Windows-inspired graphical operating system for CC:Tweaked, designed for Minecraft 1.16.5 RP computers.
 
 ## Install
 
-Enable HTTP in CC:Tweaked and run:
+Enable the HTTP API in CC:Tweaked and run:
 
 ```lua
 wget run https://raw.githubusercontent.com/Frez7373/OScctweaked/main/installer.lua
 ```
 
-## Current shell
+The installer deploys the current shell, core UI, window manager and built-in applications, then creates `startup.lua` so the OS starts on boot.
 
-- Windows-style desktop
-- Start Menu
-- Taskbar
-- Touchscreen-first navigation
-- Lock screen
-- Notification/toast area
-- Desktop refresh button
-- World-day clock
+## UX goals
+
+OScctweaked is designed so players do not need to remember terminal commands for normal RP computer use. Programs are opened from the desktop or Start menu, and the shell provides a Windows-like taskbar, application search and touch/mouse navigation.
+
+## Core
+
+- Windows-style desktop and Start menu
+- Application search
+- Taskbar with running applications
+- Multiple application windows
+- Focus, minimize, maximize and close
+- Dragging windows with mouse input
+- Touch-friendly controls and `monitor_touch` handling
 - Responsive layout for different terminal sizes
+- Minecraft world-day information
 
-## Apps
+## Built-in apps
 
 - File Explorer
 - Calculator
-- Touch Notepad with on-screen keyboard
-- Clock
+- Notepad with on-screen keyboard
 - Paint
-- System Monitor
-- Settings
+- Clock
 - Calendar
-- Touch Terminal
-- HTTP Browser
-- About
+- Settings and themes
+- Task Manager / System
+- Web quick links
+- Mail
+- App Center
+- Command Center for rare maintenance actions
 
-## Architecture
+## Compatibility approach
 
-`os.lua` is the desktop shell, `ui.lua` is the shared visual toolkit, and `apps/` contains applications. Built-in applications use `mouse_click` and `monitor_touch` for touchscreen navigation.
+The shell uses long-standing CC:Tweaked APIs such as `window.create`, terminal redirects, `mouse_click`, `mouse_drag` and `monitor_touch`, avoiding newer window APIs where possible. This is intentional for Minecraft 1.16.5 Forge compatibility.
 
-## Target
+## Structure
 
-CC:Tweaked computers and advanced computers with monitors/touchscreen peripherals.
+- `os.lua` - desktop and window manager
+- `core/ui.lua` - shared drawing toolkit
+- `core/apps.lua` - application registry
+- `programs/` - built-in applications
+- `installer.lua` - one-command installer
+
+The repository also contains older prototype files from earlier iterations. They are not used by the new shell.
