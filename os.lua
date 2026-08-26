@@ -7,8 +7,26 @@ local windows={}; local notice=nil; local noticeUntil=0; local dragging=nil; loc
 local function say(t,s) notice=t; noticeUntil=os.clock()+(s or 3) end
 local function desktopHeight() return math.max(6,H-2) end
 local function visibleApps() local o={}; for _,a in ipairs(registry) do if search=="" or a.title:lower():find(search:lower(),1,true) then table.insert(o,a) end end; return o end
+local function redraw() end
 local function makeCtx() return {apps=registry,theme=theme.name,setTheme=function(id) if id=="dark" then theme.name="dark"; theme.wall=colors.black; theme.task=colors.gray; theme.accent=colors.cyan elseif id=="green" then theme.name="green"; theme.wall=colors.green; theme.task=colors.gray; theme.accent=colors.lime else theme.name="blue"; theme.wall=colors.blue; theme.task=colors.gray; theme.accent=colors.cyan end; redraw() end,notify=function(t) say(t,3) end} end
-local function buildContent(w) if w.content then w.content.setVisible(false) end; w.content=window.create(term.native,w.x,w.y+2,math.max(8,w.w),math.max(4,w.h-2),false); w.content.setVisible(w.visible and not w.minimized) end
+local function safeDraw(w)
+  if not w.content then return end
+  local old=term.current(); term.redirect(w.content); w.content.clear();
+  local ok,err=pcall(function() w.app.draw(w.content,w.ctx) end)
+  if not ok then
+    local ww,hh=w.content.getSize(); w.appError=tostring(err)
+    term.setBackgroundColor(colors.black); term.setTextColor(colors.red); term.clear(); term.setCursorPos(1,2); print("Application error")
+    term.setTextColor(colors.white); local lines={}; for line in (w.appError.."\n"):gmatch("(.-)\n") do table.insert(lines,line) end; for i=1,math.min(#lines,hh-5) do term.setCursorPos(1,3+i); write(lines[i]:sub(1,ww)) end
+    term.setTextColor(colors.lightGray); term.setCursorPos(1,hh-1); write("Close this window to return.")
+  else w.appError=nil end
+  term.redirect(old)
+end
+local function buildContent(w)
+  if w.content then w.content.setVisible(false) end
+  w.content=window.create(term.native,w.x,w.y+2,math.max(8,w.w),math.max(4,w.h-2),false)
+  w.content.setVisible(w.visible and not w.minimized)
+  if w.appError then safeDraw(w) end
+end
 local function drawDesktop()
  term.setBackgroundColor(theme.wall); term.setTextColor(colors.white); term.clear()
  local top=desktopHeight()-1
@@ -30,31 +48,33 @@ local function drawStart()
  local list=visibleApps(); local cw=math.max(12,math.floor((mw-3)/2)); for i,a in ipairs(list) do local n=i-1; local bx=x+1+(n%2)*cw; local by=y+6+math.floor(n/2)*2; if by+1<y+mh-2 then ui.button(bx,by,bx+cw-2,by+1,a.icon.." "..a.title,colors.gray) end end
  ui.button(x+1,y+mh-1,x+11,y+mh,"LOCK",colors.gray); ui.button(x+13,y+mh-1,x+27,y+mh,"SHUTDOWN",colors.red)
 end
-local function redraw()
+local function redrawImpl()
  W,H=term.getSize(); drawDesktop(); drawTaskbar(); for _,w in ipairs(windows) do if w.visible and not w.minimized then frame(w,w==windows[#windows]) end end; drawStart(); if notice and os.clock()<noticeUntil then local ww=math.min(34,W-4); local nx=W-ww-1; ui.fill(nx,2,W-2,4,colors.gray,colors.white); ui.text(nx+2,3,notice:sub(1,ww-4),colors.white,colors.gray) end; for _,w in ipairs(windows) do if w.content then w.content.setVisible(false) end end; if windows[#windows] and windows[#windows].visible and not windows[#windows].minimized then windows[#windows].content.setVisible(true) end
 end
+redraw=redrawImpl
 local function focus(w)
- for i,x in ipairs(windows) do if x==w then table.remove(windows,i); break end end; table.insert(windows,w); w.minimized=false; redraw(); local old=term.current(); term.redirect(w.content); pcall(function() w.app.draw(w.content,w.ctx) end); term.redirect(old); redraw()
+ for i,x in ipairs(windows) do if x==w then table.remove(windows,i); break end end; table.insert(windows,w); w.minimized=false; redraw(); safeDraw(w); redraw()
 end
 local function create(meta)
- local ok,mod=pcall(function() return loadfile(meta.file)() end); if not ok or type(mod)~="table" or type(mod.new)~="function" then say("Cannot load "..meta.title,4); return end
+ local ok,mod=pcall(function() local chunk=loadfile(meta.file); if not chunk then error("File not found: "..meta.file) end; return chunk() end); if not ok or type(mod)~="table" or type(mod.new)~="function" then say("Cannot load "..meta.title..": "..tostring(mod),5); return end
  local w=math.min(meta.w or 40,math.max(30,W-4)); local h=math.min(meta.h or 18,math.max(10,H-4)); local o=(#windows*2)%8; local x=math.max(2,math.floor((W-w)/2)+o); local y=math.max(2,math.floor((desktopHeight()-h)/2)+o); if x+w>W then x=2 end; if y+h>desktopHeight() then y=2 end
- local base=makeCtx(); local ok2,obj=pcall(function() return mod.new(base) end); if not ok2 or type(obj)~="table" then say("Application failed",4); return end
+ local base=makeCtx(); local ok2,obj=pcall(function() return mod.new(base) end); if not ok2 or type(obj)~="table" or type(obj.draw)~="function" or type(obj.handle)~="function" then say("Application setup failed: "..tostring(obj),5); return end
  local win={meta=meta,app=obj,ctx=obj.ctx or base,x=x,y=y,w=w,h=h,visible=true,minimized=false,maximized=false}; buildContent(win); table.insert(windows,win); focus(win)
 end
 local function closeWin(w) if w.content then w.content.setVisible(false) end; for i,x in ipairs(windows) do if x==w then table.remove(windows,i); break end end; redraw() end
 local function maxWin(w)
- if not w.maximized then w.restore={x=w.x,y=w.y,w=w.w,h=w.h}; w.x=2; w.y=2; w.w=W-2; w.h=desktopHeight()-2 else local r=w.restore; w.x=r.x; w.y=r.y; w.w=r.w; w.h=r.h; w.maximized=false end
- buildContent(w); redraw(); local old=term.current(); term.redirect(w.content); pcall(function() w.app.draw(w.content,w.ctx) end); term.redirect(old); redraw()
+ if not w.maximized then w.restore={x=w.x,y=w.y,w=w.w,h=w.h}; w.x=2; w.y=2; w.w=W-2; w.h=desktopHeight()-2; w.maximized=true else local r=w.restore; w.x=r.x; w.y=r.y; w.w=r.w; w.h=r.h; w.maximized=false end
+ buildContent(w); redraw(); safeDraw(w); redraw()
 end
-local function moveWin(w,nx,ny) w.x=math.max(1,math.min(nx,W-w.w+1)); w.y=math.max(2,math.min(ny,desktopHeight()-w.h+1)); buildContent(w); redraw(); local old=term.current(); term.redirect(w.content); pcall(function() w.app.draw(w.content,w.ctx) end); term.redirect(old); redraw() end
+local function moveWin(w,nx,ny) w.x=math.max(1,math.min(nx,W-w.w+1)); w.y=math.max(2,math.min(ny,desktopHeight()-w.h+1)); buildContent(w); safeDraw(w); redraw()
+end
 local function hitWin(x,y) for i=#windows,1,-1 do local w=windows[i]; if w.visible and not w.minimized and ui.hit(x,y,w.x,w.y,w.x+w.w-1,w.y+w.h-1) then return w end end end
 local function shortcut(x,y) local cols=4; local gapX=math.max(11,math.floor(W/5)); local gapY=5; for i,a in ipairs(registry) do local n=i-1; local bx=2+(n%cols)*gapX; local by=3+math.floor(n/cols)*gapY; if ui.hit(x,y,bx,by,bx+8,by+3) then if selectedShortcut==i and os.clock()-lastShortcut<0.55 then selectedShortcut=nil; create(a) else selectedShortcut=i; lastShortcut=os.clock(); redraw() end; return true end end; return false end
 local function click(x,y)
  if startOpen then local mw=math.min(44,W-2); local mh=math.min(H-4,20); local sx=2; local sy=H-mh-1; if ui.hit(x,y,sx+1,sy+3,sx+mw-1,sy+4) then return end; if ui.hit(x,y,sx+13,sy+mh-1,sx+27,sy+mh) then os.shutdown() end; local list=visibleApps(); local cw=math.max(12,math.floor((mw-3)/2)); if y>=sy+6 then local col=math.floor((x-(sx+1))/cw); local row=math.floor((y-(sy+6))/2); local i=row*2+col+1; if i>=1 and i<=#list then startOpen=false; create(list[i]); return end end; startOpen=false; redraw(); return end
  if ui.hit(x,y,1,H-1,8,H) or ui.hit(x,y,10,H-1,29,H) then startOpen=true; search=""; redraw(); return end
  local tx=31; for _,w in ipairs(windows) do if tx+10<W-20 and ui.hit(x,y,tx,H-1,tx+10,H) then focus(w); return end; tx=tx+12 end
- local w=hitWin(x,y); if w then focus(w); if ui.hit(x,y,w.x+w.w-2,w.y,w.x+w.w-1,w.y) then closeWin(w); return end; if ui.hit(x,y,w.x+w.w-10,w.y,w.x+w.w-7,w.y) then w.minimized=true; w.content.setVisible(false); redraw(); return end; if ui.hit(x,y,w.x+w.w-6,w.y,w.x+w.w-3,w.y) then maxWin(w); return end; if y==w.y then dragging=w; dragOX=x-w.x; dragOY=y-w.y; return end; local lx=x-w.x+1; local ly=y-(w.y+2)+1; local old=term.current(); term.redirect(w.content); local ok,changed=pcall(function() return w.app.handle("click",lx,ly,w.ctx) end); if ok and changed then pcall(function() w.app.draw(w.content,w.ctx) end) end; term.redirect(old); redraw(); return end
+ local w=hitWin(x,y); if w then focus(w); if ui.hit(x,y,w.x+w.w-2,w.y,w.x+w.w-1,w.y) then closeWin(w); return end; if ui.hit(x,y,w.x+w.w-10,w.y,w.x+w.w-7,w.y) then w.minimized=true; w.content.setVisible(false); redraw(); return end; if ui.hit(x,y,w.x+w.w-6,w.y,w.x+w.w-3,w.y) then maxWin(w); return end; if y==w.y then dragging=w; dragOX=x-w.x; dragOY=y-w.y; return end; if w.appError then return end; local lx=x-w.x+1; local ly=y-(w.y+2)+1; local old=term.current(); term.redirect(w.content); local ok,changed=pcall(function() return w.app.handle("click",lx,ly,w.ctx) end); if not ok then w.appError=tostring(changed); safeDraw(w) elseif changed then safeDraw(w) end; term.redirect(old); redraw(); return end
  shortcut(x,y)
 end
 redraw(); os.startTimer(1)
@@ -68,5 +88,6 @@ while running do
  elseif ev=="mouse_up" then dragging=nil
  elseif ev=="char" and startOpen then search=search..p1; redraw()
  elseif ev=="key" then if startOpen and p1==keys.backspace then search=search:sub(1,-2); redraw() elseif p1==keys.escape then startOpen=false; redraw() end
+ elseif ev=="peripheral" or ev=="peripheral_detach" then say("Peripheral changed",3); redraw()
  elseif ev=="terminate" then running=false end
 end
